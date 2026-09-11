@@ -260,6 +260,32 @@ header.app-header{
 /* ============ DASHBOARD STATS ============ */
 .dashboard{ max-width:1440px; margin:0 auto; width:100%; padding:16px 26px 6px; }
 .stat-strip{ display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; scrollbar-width:thin; }
+/* ============ ملخص المقررات الجاهزة للتسجيل ============ */
+.stat-card.stat-ready{ cursor:pointer; }
+.stat-card.stat-ready:hover{ transform:translateY(-1px); box-shadow:0 8px 22px rgba(21,138,69,.10); }
+.ready-summary{
+  background:#F8FCF9; border:1px solid #DCEFE2; border-radius:10px; padding:10px 12px; margin:0 0 12px;
+}
+.ready-summary-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.ready-summary-title{ font-size:12px; font-weight:900; color:#158A45; }
+.ready-summary-count{ font-size:10px; font-weight:800; color:#158A45; background:#EAFBF1; border-radius:999px; padding:3px 8px; }
+.ready-course-list{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+.ready-course-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 8px; background:#fff; border:1px solid #E4EEE7; border-radius:8px; cursor:pointer; }
+.ready-course-item:hover{ border-color:#A9D9BA; background:#FBFEFC; }
+.ready-course-main{ min-width:0; }
+.ready-course-code{ font-family:var(--font-en); font-size:9.5px; font-weight:900; color:#158A45; }
+.ready-course-name{ font-size:10.5px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.ready-course-units{ flex-shrink:0; font-size:9.5px; font-weight:800; color:var(--muted); background:var(--bg); border-radius:5px; padding:3px 6px; }
+.ready-empty{ font-size:11px; color:var(--muted); line-height:1.8; padding:4px 0; }
+.ready-modal-list{ display:grid; gap:7px; margin-top:8px; }
+.ready-modal-item{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 10px; background:#F8FCF9; border:1px solid #DCEFE2; border-radius:9px; cursor:pointer; }
+.ready-modal-item:hover{ border-color:#A9D9BA; background:#FBFEFC; }
+.ready-modal-code{ font-family:var(--font-en); font-size:10px; font-weight:900; color:#158A45; }
+.ready-modal-name{ font-size:11.5px; font-weight:800; color:var(--ink); margin-top:2px; }
+.ready-modal-meta{ flex-shrink:0; font-size:10px; font-weight:800; color:var(--muted); }
+.ready-modal-note{ margin-top:10px; font-size:10px; line-height:1.8; color:var(--muted); background:var(--bg); border-radius:8px; padding:7px 9px; }
+@media (max-width:640px){ .ready-course-list{ grid-template-columns:1fr; } }
+
 .stat-card{
   flex:1 1 0; min-width:130px;
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
@@ -984,6 +1010,49 @@ function prereqsComplete(c){
   return c.prereq.every(id => isComplete(id));
 }
 
+function isReadyToRegister(c){
+  // يطابق منطق وسم "جاهز للتسجيل" في البطاقة الذكية دون تغيير سلوكه الحالي.
+  return !!(c && !c.isPlaceholder && !isComplete(c.id) && c.prereq && c.prereq.length && prereqsComplete(c));
+}
+
+function getReadyToRegisterCourses(){
+  return [...COURSES, ...ELECTIVES].filter(isReadyToRegister);
+}
+
+function readyCourseRowsHtml(list, modal=false){
+  if (!list.length) return `<div class="ready-empty">لا توجد مقررات جاهزة للتسجيل حاليًا وفقًا للمقررات المكتملة والمتطلبات السابقة المسجلة في StatPath.</div>`;
+  return list.map(c => modal ? `
+    <div class="ready-modal-item" onclick="openCourseModal('${c.id}')">
+      <div class="ready-course-main"><div class="ready-modal-code">${c.id}</div><div class="ready-modal-name">${c.name}</div></div>
+      <span class="ready-modal-meta">${c.units} وحدات</span>
+    </div>` : `
+    <div class="ready-course-item" onclick="openCourseModal('${c.id}')">
+      <div class="ready-course-main"><div class="ready-course-code">${c.id}</div><div class="ready-course-name">${c.name}</div></div>
+      <span class="ready-course-units">${c.units}</span>
+    </div>`).join('');
+}
+
+function openReadyCourses(){
+  const list = getReadyToRegisterCourses();
+  document.getElementById("modalOverlay").classList.remove("print-report-mode");
+  document.body.classList.remove("report-mode");
+  document.getElementById("modalBox").style.setProperty("--accent", "#158A45");
+  document.getElementById("modalBox").style.borderTopColor = "#158A45";
+  document.getElementById("modalBreadcrumb").style.display = "none";
+  breadcrumbStack = [];
+  document.getElementById("modalContent").innerHTML = `
+    <div class="m-head">
+      <div class="m-badges"><span class="m-code" style="--accent:#158A45;--accent-bg:#EAFBF1;">جاهز للتسجيل</span><span class="m-units-badge">${list.length} مقررات</span></div>
+      <h3 class="m-name">المقررات الجاهزة للتسجيل</h3>
+    </div>
+    <div class="m-section">
+      <div class="m-section-label">✓ بناءً على المقررات المكتملة والمتطلبات السابقة</div>
+      <div class="ready-modal-list">${readyCourseRowsHtml(list, true)}</div>
+      <div class="ready-modal-note">تُظهر هذه القائمة المقررات التي أصبحت متاحة وفق بيانات التقدم المسجلة داخل StatPath، ولا تُغني عن مراجعة واعتماد التسجيل مع المرشد الأكاديمي.</div>
+    </div>`;
+  document.getElementById("modalOverlay").classList.add("active");
+}
+
 // دالة موحّدة لإعادة رسم كل شيء بعد أي تغيير في التقدم (تشمل شريط الاختياريات إن وُجد)
 function refreshAllViews(){
   renderPlanGrid();
@@ -1242,6 +1311,14 @@ function openProgressReport(){
           <span class="dep-chip none">نسبة الإنجاز الحالية: ${p.percent}%</span>
         </div>
       </div>
+      <div class="ready-summary">
+        <div class="ready-summary-head">
+          <span class="ready-summary-title">🟢 المقررات الجاهزة للتسجيل</span>
+          <span class="ready-summary-count">${getReadyToRegisterCourses().length} مقررات</span>
+        </div>
+        <div class="ready-course-list">${readyCourseRowsHtml(getReadyToRegisterCourses())}</div>
+        <div class="ready-modal-note">وفقًا للمقررات المكتملة والمتطلبات السابقة المسجلة في StatPath. يُنصح بمراجعة القائمة مع المرشد الأكاديمي قبل التسجيل.</div>
+      </div>
       <table class="pr-table">
         <thead><tr>
           <th>اسم المقرر</th><th>الرمز</th><th>الوحدات</th><th>نوع المقرر</th><th>الحالة</th><th>تاريخ الإنجاز</th>
@@ -1294,10 +1371,11 @@ function renderStats(){
     { cls:"stat-support",  icon:ICONS.puzzle,     num:`${p.supDone}/${s.supportCount}`,label:"مقررات داعمة" },
     { cls:"stat-univ",     icon:ICONS.building,   num:`${p.univDone}/${s.univCount}`,  label:"متطلبات الجامعة" },
     { cls:"stat-elective", icon:ICONS.star,       num:s.electivePoolCount, label:"سلة اختيارية", clickable:true },
+    { cls:"stat-ready",    icon:ICONS.calendar,   num:getReadyToRegisterCourses().length, label:"جاهز للتسجيل", clickable:"ready" },
     { cls:"stat-sem",      icon:ICONS.layers,     num:`${p.totalDoneCourses}/${s.totalCourses}`, label:"المقررات المكتملة" }
   ];
   document.getElementById("statStrip").innerHTML = cards.map(c => `
-    <div class="stat-card ${c.cls}" ${c.clickable ? `onclick="openElectivePicker(null)" title="عرض جميع المقررات الاختيارية (اختر 2)"` : ""}>
+    <div class="stat-card ${c.cls}" ${c.clickable === true ? `onclick="openElectivePicker(null)" title="عرض جميع المقررات الاختيارية (اختر 2)"` : c.clickable === "ready" ? `onclick="openReadyCourses()" title="عرض المقررات الجاهزة للتسجيل"` : ""}>
       <div class="stat-icon-badge">${c.customIcon || c.icon}</div>
       <div class="stat-text">
         <span class="stat-num">${c.num}</span><span class="stat-label">${c.label}</span>${c.clickable ? `<span class="stat-arrow">${ICONS.chevronSmall}</span>` : ""}
