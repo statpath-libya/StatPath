@@ -585,7 +585,13 @@ footer.app-footer .foot-copy{ font-size:11px; color:var(--muted); font-weight:70
   .inst-logo-box{ width:34px; height:34px; }
   .institutions{ gap:6px; }
   .title-eyebrow{ display:none; }
-  .title-sub{ display:none; }
+  .title-sub{
+    display:block;
+    font-size:9.5px;
+    line-height:1.45;
+    max-width:100%;
+    text-align:center;
+  }
   .header-nav-inner{ padding:7px 14px; gap:8px; }
   .dashboard{ padding:12px 16px 4px; }
   .sem-tabs{ display:none; } /* لا حاجة للتبويبات: كل الفصول تظهر دائماً حتى على الجوال */
@@ -624,10 +630,33 @@ footer.app-footer .foot-copy{ font-size:11px; color:var(--muted); font-weight:70
 @media (max-height:500px){
   header.app-header{ position:static; }
   .header-top{ padding:6px 14px; gap:8px; }
-  .brand-logo-box, .institutions, .title-eyebrow, .title-sub{ display:none; }
+  .brand-logo-box{
+    display:flex;
+    width:32px;
+    height:32px;
+    border-radius:8px;
+  }
+  .institutions{
+    display:flex;
+    gap:5px;
+  }
+  .inst-logo-box{
+    display:flex;
+    width:30px;
+    height:30px;
+    border-radius:8px;
+  }
   .brand-text{ display:none; }
+  .title-eyebrow{ display:none; }
   .title-main{ font-size:13px; }
-  .title-block{ flex-direction:row; }
+  .title-sub{
+    display:block;
+    font-size:9px;
+    line-height:1.35;
+    max-width:360px;
+    white-space:normal;
+  }
+  .title-block{ flex-direction:column; gap:1px; }
   .header-nav-inner{ padding:5px 14px; gap:8px; }
   .search-wrap input{ padding:6px 34px 6px 12px; }
   .nav-actions{ gap:6px; }
@@ -1011,12 +1040,42 @@ function prereqsComplete(c){
 }
 
 function isReadyToRegister(c){
-  // يطابق منطق وسم "جاهز للتسجيل" في البطاقة الذكية دون تغيير سلوكه الحالي.
-  return !!(c && !c.isPlaceholder && !isComplete(c.id) && c.prereq && c.prereq.length && prereqsComplete(c));
+  // المقرر الجاهز للتسجيل:
+  // 1) غير مكتمل.
+  // 2) ليس خانة اختيارية وهمية.
+  // 3) تُستوفى متطلبات المقررات السابقة إن وُجدت.
+  // 4) تُستوفى الشروط الإدارية الخاصة بالمقرر إن وُجدت.
+  if (!c || c.isPlaceholder || isComplete(c.id)) return false;
+
+  // الشروط الإدارية الرقمية مثل: "إنجاز 100 وحدة معتمدة على الأقل".
+  if (c.prereqText){
+    const m = String(c.prereqText).match(/(\d+)\s*وحدة/);
+    if (m){
+      const requiredUnits = Number(m[1]);
+      const doneUnits = COURSES.reduce((sum, course) =>
+        sum + (isComplete(course.id) ? course.units : 0), 0)
+        + ELECTIVES.reduce((sum, course) =>
+        sum + (isComplete(course.id) ? course.units : 0), 0);
+
+      if (doneUnits < requiredUnits) return false;
+    }
+  }
+
+  // المتطلبات السابقة العادية.
+  if (c.prereq && c.prereq.length && !prereqsComplete(c)) return false;
+
+  return true;
 }
 
+// الفصل الأول مرحلة تمهيدية مغلقة إداريًا: مقرراته إجبارية ولا تُعرض
+// ضمن قائمة "جاهز للتسجيل" لأن الطالب ينتسب للقسم ابتداءً من الفصل الثاني.
+// تبقى مقررات الفصل الأول ظاهرة بالكامل في الخطة ويمكن متابعة إنجازها كالمعتاد.
+const READY_REGISTRATION_MIN_SEM = 2;
+
 function getReadyToRegisterCourses(){
-  return [...COURSES, ...ELECTIVES].filter(isReadyToRegister);
+  return [...COURSES, ...ELECTIVES].filter(c =>
+    c && !c.isPlaceholder && Number(c.sem) >= READY_REGISTRATION_MIN_SEM && isReadyToRegister(c)
+  );
 }
 
 function readyCourseRowsHtml(list, modal=false){
@@ -1807,4 +1866,3 @@ function initSplashScreen(){
 </script>
 </body>
 </html>
-
